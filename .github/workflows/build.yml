@@ -1,1 +1,36 @@
+name: Build Shadow
 
+on:
+  workflow_dispatch: # 手動でビルドを開始できるようにする
+
+jobs:
+  build:
+    runs-on: macos-latest # iOSアプリのビルドにはMacの環境が必要
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive # サブモジュールも一緒に取得
+
+      - name: Setup Theos
+        run: |
+          sudo git clone --recursive https://github.com/theos/theos.git /opt/theos
+          curl -LO https://github.com/theos/sdks/archive/master.zip
+          TMP=$(mktemp -d)
+          unzip master.zip -d $TMP
+          sudo mv $TMP/sdks-master/*.sdk /opt/theos/sdks
+          rm -rf master.zip $TMP
+          echo "THEOS=/opt/theos" >> $GITHUB_ENV
+
+      - name: Build Dylib
+        run: |
+          export THEOS=/opt/theos
+          # Shadowのディレクトリに移動してビルド（Makefileがある場所）
+          make package FINALPACKAGE=1
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Shadow-Dylib
+          path: packages/*.deb # .debの中に.dylibが入っています
